@@ -585,7 +585,7 @@
 <!-- HERO SCROLL SLIDESHOW -->
 <div id="hero-sticky-container">
   <div id="hero-sticky">
-    <video id="hero-video" autoplay muted loop playsinline preload="auto">
+    <video id="hero-video" muted playsinline preload="auto">
       <source src="https://res.cloudinary.com/dakh86sbn/video/upload/v1782204030/kling_20260406_%E4%BD%9C%E5%93%81_A_cinemati_4118_0_sa1ao0.mp4" type="video/mp4"/>
     </video>
     <div id="hero-overlay"></div>
@@ -791,13 +791,24 @@
     nav.classList.toggle('scrolled', window.scrollY > 60);
   }, { passive: true });
 
-  // ── SCROLL SLIDESHOW
+  // ── SCROLL-DRIVEN VIDEO + SLIDESHOW
+  const video     = document.getElementById('hero-video');
   const container = document.getElementById('hero-sticky-container');
   const slides    = document.querySelectorAll('.hero-slide');
   const dots      = document.querySelectorAll('.dot');
   const scrollHint = document.getElementById('scroll-hint');
   const totalSlides = slides.length;
   let currentSlide = 0;
+  let videoDuration = 0;
+  let lastScrollY = window.scrollY;
+  let scrollVelocity = 0;
+  let rafId = null;
+
+  // Warte bis Video-Metadaten geladen sind
+  video.addEventListener('loadedmetadata', () => {
+    videoDuration = video.duration;
+    video.currentTime = 0;
+  });
 
   function setSlide(index) {
     if (index === currentSlide) return;
@@ -811,17 +822,30 @@
   function onScroll() {
     const containerTop    = container.getBoundingClientRect().top;
     const containerHeight = container.offsetHeight;
-    const scrolled = -containerTop; // how far we've scrolled into it
+    const scrolled = -containerTop;
     const total    = containerHeight - window.innerHeight;
 
-    // Scroll hint fades out after first slide zone
+    // Scroll hint ausblenden
     const progress = Math.max(0, Math.min(1, scrolled / total));
     scrollHint.style.opacity = progress < 0.05 ? 1 : Math.max(0, 1 - (progress - 0.05) / 0.1);
 
-    // Divide scroll into equal zones per slide
+    // Slides wechseln
     const zone = total / totalSlides;
     const slideIndex = Math.min(totalSlides - 1, Math.floor(scrolled / zone));
     if (slideIndex >= 0) setSlide(slideIndex);
+
+    // ── Video scroll-gesteuert abspielen
+    if (videoDuration > 0 && total > 0) {
+      const clampedProgress = Math.max(0, Math.min(1, scrolled / total));
+      const targetTime = clampedProgress * videoDuration;
+      // Sanft zum Zielwert bewegen
+      const diff = targetTime - video.currentTime;
+      video.currentTime = video.currentTime + diff * 0.25;
+    }
+
+    // Scroll-Geschwindigkeit berechnen (für sanftes Einfrieren)
+    scrollVelocity = Math.abs(window.scrollY - lastScrollY);
+    lastScrollY = window.scrollY;
   }
 
   window.addEventListener('scroll', onScroll, { passive: true });
