@@ -585,7 +585,7 @@
 <!-- HERO SCROLL SLIDESHOW -->
 <div id="hero-sticky-container">
   <div id="hero-sticky">
-    <video id="hero-video" muted playsinline preload="auto">
+    <video id="hero-video" autoplay muted loop playsinline preload="auto">
       <source src="https://res.cloudinary.com/dakh86sbn/video/upload/v1782204030/kling_20260406_%E4%BD%9C%E5%93%81_A_cinemati_4118_0_sa1ao0.mp4" type="video/mp4"/>
     </video>
     <div id="hero-overlay"></div>
@@ -791,24 +791,31 @@
     nav.classList.toggle('scrolled', window.scrollY > 60);
   }, { passive: true });
 
-  // ── SCROLL-DRIVEN VIDEO + SLIDESHOW
-  const video     = document.getElementById('hero-video');
-  const container = document.getElementById('hero-sticky-container');
-  const slides    = document.querySelectorAll('.hero-slide');
-  const dots      = document.querySelectorAll('.dot');
+  // ── VIDEO: startet beim Scrollen, pausiert wenn man aufhört
+  const video      = document.getElementById('hero-video');
+  const container  = document.getElementById('hero-sticky-container');
+  const slides     = document.querySelectorAll('.hero-slide');
+  const dots       = document.querySelectorAll('.dot');
   const scrollHint = document.getElementById('scroll-hint');
   const totalSlides = slides.length;
   let currentSlide = 0;
-  let videoDuration = 0;
-  let lastScrollY = window.scrollY;
-  let scrollVelocity = 0;
-  let rafId = null;
+  let scrollTimer  = null;
+  let heroVisible  = true;
 
-  // Warte bis Video-Metadaten geladen sind
-  video.addEventListener('loadedmetadata', () => {
-    videoDuration = video.duration;
-    video.currentTime = 0;
-  });
+  // Video am Anfang pausiert
+  video.pause();
+  video.currentTime = 0;
+
+  // Prüfen ob Hero sichtbar ist
+  const heroObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      heroVisible = entry.isIntersecting;
+      if (!heroVisible) {
+        video.pause();
+      }
+    });
+  }, { threshold: 0.1 });
+  heroObserver.observe(document.getElementById('hero-sticky'));
 
   function setSlide(index) {
     if (index === currentSlide) return;
@@ -834,18 +841,14 @@
     const slideIndex = Math.min(totalSlides - 1, Math.floor(scrolled / zone));
     if (slideIndex >= 0) setSlide(slideIndex);
 
-    // ── Video scroll-gesteuert abspielen
-    if (videoDuration > 0 && total > 0) {
-      const clampedProgress = Math.max(0, Math.min(1, scrolled / total));
-      const targetTime = clampedProgress * videoDuration;
-      // Sanft zum Zielwert bewegen
-      const diff = targetTime - video.currentTime;
-      video.currentTime = video.currentTime + diff * 0.25;
+    // Video abspielen während Scrollen, pausieren wenn gestoppt
+    if (heroVisible) {
+      video.play().catch(() => {});
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => {
+        video.pause();
+      }, 150); // pausiert 150ms nach dem letzten Scroll
     }
-
-    // Scroll-Geschwindigkeit berechnen (für sanftes Einfrieren)
-    scrollVelocity = Math.abs(window.scrollY - lastScrollY);
-    lastScrollY = window.scrollY;
   }
 
   window.addEventListener('scroll', onScroll, { passive: true });
